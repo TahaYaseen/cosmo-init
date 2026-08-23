@@ -1,0 +1,90 @@
+@import 'tailwindcss';
+
+/*
+ * Golden Alchemist design system — Tailwind v4 CSS-first theme extension.
+ * Tokens transcribed 1:1 from /home/mohammady/Documents/learning/Glowrie/
+ * home page/DESIGN.md and the approved UX prototype
+ * (docs/ux/ux-design-html/visitor/index.html), per architecture.md §24.
+ */
+@theme {
+  /* ---- Colors ---- */
+  --color-surface: #fcf9f8;
+  --color-surface-dim: #dcd9d9;
+  --color-surface-lowest: #ffffff;
+  --color-surface-low: #f6f3f2;
+  --color-surface-high: #eae7e7;
+  --color-surface-highest: #e5e2e1;
+
+  --color-on-surface: #1c1b1b;
+  --color-on-surface-variant: #4d4635;
+  --color-obsidian: #1a1a1a;
+
+  --color-outline: #7f7663;
+  --color-outline-variant: #d0c5af;
+
+  --color-primary: #735c00; /* Alchemist Gold (text/accent weight) */
+  --color-primary-container: #d4af37; /* Alchemist Gold (fill weight) */
+  --color-on-primary: #ffffff;
+
+  --color-secondary: #6c5d2e; /* Champagne Gold */
+  --color-secondary-container: #f3dea3;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+
+  /* ---- Typography ---- */
+  --font-display: 'Bodoni Moda', Georgia, 'Times New Roman', serif;
+  --font-body: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  /* ---- Spacing (4px base unit; large multiples for section rhythm) ---- */
+  --spacing-gutter: 24px;
+  --spacing-margin-mobile: 16px;
+  --spacing-margin-desktop: 64px;
+  --spacing-section-gap: 120px;
+
+  /* ---- Shape: sharp (0-radius) everywhere except deliberate pill/circle
+     decorative elements, which use rounded-full directly in components. ---- */
+  --radius-none: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Sharp corners everywhere per the Golden Alchemist shape rule — belt and
+   braces alongside the @theme --radius-* overrides above. */
+button,
+input,
+textarea,
+select {
+  border-radius: 0;
+}
+
+/* No traditional drop shadows anywhere (Golden Alchemist elevation rule):
+   depth comes from tonal layering + hairline gold rules only. */
