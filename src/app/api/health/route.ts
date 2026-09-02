@@ -12,7 +12,7 @@ export async function GET() {
     await payload.find({ collection: 'products', limit: 1 });
     return NextResponse.json({ status: 'ok' }, { status: 200 });
   } catch (error) {
-    console.error('[health] check failed:', error);
+    console.error('[DB] ❌ Health check failed — database unreachable:', error);
     return NextResponse.json({ status: 'error' }, { status: 503 });
   }
 }

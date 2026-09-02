@@ -12,7 +12,20 @@ let cached: Promise<Payload> | null = null;
  */
 export function getPayloadClient(): Promise<Payload> {
   if (!cached) {
-    cached = getPayload({ config });
+    cached = getPayload({ config })
+      .then((payload) => {
+        // Unambiguous deploy-log signal that the Supabase Postgres
+        // connection (via Payload's db-postgres adapter) came up cleanly.
+        console.log('[DB] ✅ Database connection successful (Supabase Postgres)');
+        return payload;
+      })
+      .catch((error) => {
+        console.error('[DB] ❌ Database connection FAILED:', error);
+        // Don't permanently cache a rejected promise — otherwise every
+        // future call keeps failing even after the DB recovers.
+        cached = null;
+        throw error;
+      });
   }
   return cached;
 }
