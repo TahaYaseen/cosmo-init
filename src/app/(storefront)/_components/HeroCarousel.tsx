@@ -1,10 +1,28 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
+
+export interface HeroSlideVisual {
+  url?: string | null;
+  alt?: string | null;
+  /** Product name, used as alt-text fallback when the Media has none. */
+  name?: string | null;
+}
 
 export interface HeroCarouselProps {
   /** Name of the currently-featured product, used on the 3rd marketing slide. */
   featuredProductName?: string;
+  /**
+   * Index-aligned product visual per slide (same Media-resolution pattern as
+   * ProductCard.tsx / FeaturedSpotlight.tsx: `typeof product.image ===
+   * 'object' ? product.image : null`). Slide 3 (index 2) is the real
+   * Featured Product; slides 1-2 show other Published products for now, so
+   * the hero shows real product photos instead of the generic placeholder
+   * icon whenever one is available. A `null`/missing entry falls back to
+   * the placeholder icon for that slide.
+   */
+  slideImages?: Array<HeroSlideVisual | null>;
 }
 
 const AUTOPLAY_MS = 5000;
@@ -13,9 +31,11 @@ const AUTOPLAY_MS = 5000;
  * Home hero marketing carousel — 3 slides, autoplay every 5s, pauses on
  * hover. This is static marketing content (not CMS-managed, per ADR-007's
  * spirit for non-Product content) except the 3rd slide's headline, which
- * reflects the real Featured Product name.
+ * reflects the real Featured Product name, and the 3rd slide's visual, which
+ * reflects the real Featured Product image (fetched from the Products
+ * collection the same way the product grid/spotlight sections render it).
  */
-export function HeroCarousel({ featuredProductName }: HeroCarouselProps) {
+export function HeroCarousel({ featuredProductName, slideImages }: HeroCarouselProps) {
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -49,6 +69,7 @@ export function HeroCarousel({ featuredProductName }: HeroCarouselProps) {
       ),
       ctaLabel: 'Explore the Science',
       ctaHref: '/about',
+      showFeaturedImage: false,
     },
     {
       eyebrow: 'Featured Elixir',
@@ -110,9 +131,22 @@ export function HeroCarousel({ featuredProductName }: HeroCarouselProps) {
             </a>
           </div>
           <div className="relative flex flex-1 items-center justify-center bg-gradient-to-br from-surface-low to-surface-lowest md:w-1/2">
-            <svg width="140" height="140" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-outline opacity-50" aria-hidden="true">
-              <path d="M32 6c8 10 18 18 18 30a18 18 0 1 1-36 0C14 24 24 16 32 6Z" />
-            </svg>
+            {(() => {
+              const visual = slideImages?.[i];
+              return visual?.url ? (
+                <Image
+                  src={visual.url}
+                  alt={visual.alt || visual.name || featuredProductName || 'Featured product'}
+                  fill
+                  className="object-contain p-12"
+                  sizes="(min-width: 768px) 50vw, 100vw"
+                />
+              ) : (
+                <svg width="140" height="140" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-outline opacity-50" aria-hidden="true">
+                  <path d="M32 6c8 10 18 18 18 30a18 18 0 1 1-36 0C14 24 24 16 32 6Z" />
+                </svg>
+              );
+            })()}
           </div>
         </div>
       ))}

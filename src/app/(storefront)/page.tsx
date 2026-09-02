@@ -52,10 +52,29 @@ export default async function HomePage() {
   }
 
   const featured = products.find((p) => p.badge === 'BESTSELLER') ?? products[0];
+  // Same Payload Media-relationship resolution used by ProductCard/FeaturedSpotlight
+  // (query runs with depth: 1, so `image` is the populated Media object, not just an id).
+  const resolveHeroVisual = (product?: Product | null) => {
+    if (!product) return null;
+    const image = typeof product.image === 'object' ? product.image : null;
+    if (!image?.url) return null;
+    return { url: image.url, alt: image.alt, name: product.name };
+  };
+
+  // For now, the other 2 marketing slides also show a real product photo
+  // (rather than the generic placeholder icon) — pick 2 other Published
+  // products distinct from the Featured one, falling back gracefully when
+  // the catalog has fewer than 3 products.
+  const otherProducts = products.filter((p) => p.id !== featured?.id);
+  const heroSlideVisuals = [
+    resolveHeroVisual(otherProducts[0] ?? featured),
+    resolveHeroVisual(otherProducts[1] ?? otherProducts[0] ?? featured),
+    resolveHeroVisual(featured),
+  ];
 
   return (
     <>
-      <HeroCarousel featuredProductName={featured?.name} />
+      <HeroCarousel featuredProductName={featured?.name} slideImages={heroSlideVisuals} />
       <TrustRibbon />
 
       <section className="px-4 py-[120px] md:px-16" id="core-formulations">
