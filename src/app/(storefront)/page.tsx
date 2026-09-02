@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/feedback/EmptyState';
 import { ErrorState } from '@/components/feedback/ErrorState';
 import { HeroCarousel } from './_components/HeroCarousel';
 import { TrustRibbon } from './_components/TrustRibbon';
+import { LovedByMillions } from './_components/LovedByMillions';
 import type { Product } from '@/lib/types';
 
 // ISR fallback window (architecture.md §9/ADR-009) in case the Products
@@ -71,6 +72,8 @@ export default async function HomePage() {
       <section className="px-4 pb-[120px] md:px-16" id="featured-spotlight">
         <FeaturedSpotlight products={products} />
       </section>
+
+      <LovedByMillions />
     </>
   );
 }
