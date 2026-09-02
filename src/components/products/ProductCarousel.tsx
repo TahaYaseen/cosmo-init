@@ -41,7 +41,12 @@ export function ProductCarousel({ products }: ProductCarouselProps) {
         tabIndex={0}
       >
         {products.map((product) => (
-          <div key={product.id} data-carousel-card className="snap-start" role="listitem">
+          <div
+            key={product.id}
+            data-carousel-card
+            className="min-w-full snap-start md:min-w-[33.333%]"
+            role="listitem"
+          >
             <ProductCard product={product} />
           </div>
         ))}

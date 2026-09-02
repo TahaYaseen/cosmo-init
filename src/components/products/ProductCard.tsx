@@ -16,7 +16,7 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <Link
       href={`/products/${product.id}`}
-      className="flex min-w-full flex-col border-r border-outline-variant bg-transparent text-left last:border-r-0 md:min-w-[33.333%]"
+      className="flex h-full w-full flex-col border-r border-outline-variant bg-transparent text-left last:border-r-0"
     >
       <div className="flex items-center justify-between border-b border-outline-variant p-4">
         <span className="font-mono text-xs uppercase text-outline">{product.sku}</span>
