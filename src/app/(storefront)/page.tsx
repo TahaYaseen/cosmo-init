@@ -12,6 +12,25 @@ import type { Product } from '@/lib/types';
 // afterChange hook's revalidatePath('/') call ever fails to fire.
 export const revalidate = 3600;
 
+// Hero banner images are intentionally decoupled from any single Product's
+// `image` field (a Product's image is its own catalog/card asset, reused
+// across ProductCard/FeaturedSpotlight — it should not double as marketing
+// banner art). One media id per slide, index-aligned; a proper CMS-managed
+// "homepage hero" field (e.g. a Payload Global with 3 banner slots) is the
+// natural next step instead of a hardcoded array.
+//
+// TEMPORARY: all 3 ids currently resolve to the same underlying image
+// (media.filename = 'glowrie-body-wash-hero.jpg' for all three) — this is a
+// deliberate placeholder so the 3-slot wiring can be tested end-to-end
+// before the real, distinct per-slide photos are uploaded. Swap each id's
+// `media.url` (via the admin UI or a migration) to a different photo when
+// ready; no code change will be needed.
+const HERO_BANNER_IDS = [
+  '3067290f-20c5-4d28-8afe-26c1ba86bb96',
+  '796a26cd-85da-4cff-a1ce-3d54a395a74e',
+  'e9313d16-1343-4e06-a2d5-6e0b4b60a9fe',
+] as const;
+
 async function getPublishedProducts(): Promise<{ products: Product[] | null; error: boolean }> {
   try {
     const payload = await getPayloadClient();
@@ -29,8 +48,32 @@ async function getPublishedProducts(): Promise<{ products: Product[] | null; err
   }
 }
 
+type HeroBannerVisual = { url: string; alt?: string | null } | null;
+
+async function getHeroBannerVisual(id: string): Promise<HeroBannerVisual> {
+  try {
+    const payload = await getPayloadClient();
+    const media = await payload.findByID({ collection: 'media', id });
+    if (!media?.url) return null;
+    return { url: media.url, alt: media.alt };
+  } catch (error) {
+    console.error(`[home] failed to load hero banner media (id=${id}):`, error);
+    return null;
+  }
+}
+
+// Index-aligned with HERO_BANNER_IDS — fetched independently per slide so one
+// missing/broken id degrades only that slide (falls back to the placeholder
+// icon in HeroCarousel) instead of the whole banner.
+async function getHeroBannerVisuals(): Promise<HeroBannerVisual[]> {
+  return Promise.all(HERO_BANNER_IDS.map((id) => getHeroBannerVisual(id)));
+}
+
 export default async function HomePage() {
-  const { products, error } = await getPublishedProducts();
+  const [{ products, error }, heroSlideVisuals] = await Promise.all([
+    getPublishedProducts(),
+    getHeroBannerVisuals(),
+  ]);
 
   if (error) {
     return (
@@ -52,25 +95,6 @@ export default async function HomePage() {
   }
 
   const featured = products.find((p) => p.badge === 'BESTSELLER') ?? products[0];
-  // Same Payload Media-relationship resolution used by ProductCard/FeaturedSpotlight
-  // (query runs with depth: 1, so `image` is the populated Media object, not just an id).
-  const resolveHeroVisual = (product?: Product | null) => {
-    if (!product) return null;
-    const image = typeof product.image === 'object' ? product.image : null;
-    if (!image?.url) return null;
-    return { url: image.url, alt: image.alt, name: product.name };
-  };
-
-  // For now, the other 2 marketing slides also show a real product photo
-  // (rather than the generic placeholder icon) — pick 2 other Published
-  // products distinct from the Featured one, falling back gracefully when
-  // the catalog has fewer than 3 products.
-  const otherProducts = products.filter((p) => p.id !== featured?.id);
-  const heroSlideVisuals = [
-    resolveHeroVisual(otherProducts[0] ?? featured),
-    resolveHeroVisual(otherProducts[1] ?? otherProducts[0] ?? featured),
-    resolveHeroVisual(featured),
-  ];
 
   return (
     <>

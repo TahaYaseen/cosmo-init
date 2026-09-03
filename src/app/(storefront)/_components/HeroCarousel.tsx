@@ -6,7 +6,7 @@ import Image from 'next/image';
 export interface HeroSlideVisual {
   url?: string | null;
   alt?: string | null;
-  /** Product name, used as alt-text fallback when the Media has none. */
+  /** Optional display-name fallback, used as alt-text when the Media has none. */
   name?: string | null;
 }
 
@@ -14,13 +14,13 @@ export interface HeroCarouselProps {
   /** Name of the currently-featured product, used on the 3rd marketing slide. */
   featuredProductName?: string;
   /**
-   * Index-aligned product visual per slide (same Media-resolution pattern as
-   * ProductCard.tsx / FeaturedSpotlight.tsx: `typeof product.image ===
-   * 'object' ? product.image : null`). Slide 3 (index 2) is the real
-   * Featured Product; slides 1-2 show other Published products for now, so
-   * the hero shows real product photos instead of the generic placeholder
-   * icon whenever one is available. A `null`/missing entry falls back to
-   * the placeholder icon for that slide.
+   * Index-aligned marketing banner visual per slide. Intentionally decoupled
+   * from any Product's own `image` field (see page.tsx's getHeroBannerVisual)
+   * — this is dedicated banner art, not a product catalog photo, even though
+   * it happens to share the same `{ url, alt }` shape as the Media-relation
+   * resolution used by ProductCard.tsx / FeaturedSpotlight.tsx. Currently all
+   * 3 slides are given the same banner asset by the caller; a `null`/missing
+   * entry falls back to the placeholder icon for that slide.
    */
   slideImages?: Array<HeroSlideVisual | null>;
 }
