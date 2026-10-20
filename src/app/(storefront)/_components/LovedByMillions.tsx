@@ -30,15 +30,8 @@ const FEATURES: LovedByMillionsFeature[] = [
  * Design prototype/sign-off and never implemented. Copy is verbatim from
  * that mockup.
  *
- * The mockup's supporting image used a temporary `lh3.googleusercontent.com`
- * placeholder URL, which is not a committed project asset. A real brand
- * photo was not available at implementation time, so this ships with a
- * stock-style placeholder (`public/images/loved-by-millions.jpg`) using the
- * same picsum.photos-sourced placeholder convention already established by
- * this project's seeded product images
- * (supabase/migrations/20260823000004_seed_products.sql). Replace with a
- * real, licensed "three people holding Glowrie products" photo when one is
- * available.
+ * The supporting image is the real Glowrie Daily Moisturizing Lotion product
+ * shot (already used in the hero carousel), which matches the 6:5 frame.
  *
  * The mockup's "Read Clinical Studies" link used a bare `href="#"`
  * placeholder with no real destination specified. Per the fix instructions
@@ -99,8 +92,8 @@ export function LovedByMillions() {
 
         <div className="relative aspect-[6/5] w-full overflow-hidden bg-surface-low">
           <Image
-            src="/images/loved-by-millions.jpg"
-            alt="Three people holding Glowrie products in a retail setting"
+            src="https://res.cloudinary.com/rav4zol0/image/upload/v1792494308/slide-face-lotion-mobile.webp"
+            alt="Glowrie Daily Moisturizing Lotion bottle"
             fill
             className="object-cover"
             sizes="(min-width: 768px) 50vw, 100vw"

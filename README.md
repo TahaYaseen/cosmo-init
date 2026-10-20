@@ -203,6 +203,14 @@ pnpm dev
   create the first Content Operator account — no separate seed step needed)
 - Health check: http://localhost:3000/api/health
 
+> **Already-running dev server:** `./run.sh` checks Next's own
+> `.next/dev/lock` file before starting `next dev`. If a previous `./run.sh`
+> (or manually-started `pnpm dev`) was left running, it prints that server's
+> URL and PID and exits instead of crashing with Next's "Another next dev
+> server is already running" error — stop the old process (`kill <PID>`)
+> first if you want a fresh one. A *stale* lock (process no longer alive) is
+> removed automatically and `run.sh` starts fresh.
+
 ### Seed a few products
 
 Log into `/admin`, create 3–4 products (see `docs/refined-prd.md` §9 for

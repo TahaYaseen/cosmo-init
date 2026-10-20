@@ -52,6 +52,18 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface ProductFeedback {
+  id: string;
+  product: Product | string;
+  authorName: string;
+  rating: number;
+  comment: string;
+  feedbackDate: string;
+  status: ProductStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface User {
   id: string;
   email: string;

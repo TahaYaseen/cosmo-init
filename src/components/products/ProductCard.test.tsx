@@ -27,3 +27,16 @@ describe('ProductCard (UC-001 AC1)', () => {
     expect(screen.getByRole('link')).toHaveAttribute('href', '/products/gl-02');
   });
 });
+
+describe('ProductCard rating', () => {
+  it('shows average and review count when feedback exists', () => {
+    render(<ProductCard product={makeProduct()} rating={{ count: 12, average: 4.5 }} />);
+    expect(screen.getByText('(12 reviews)')).toBeInTheDocument();
+    expect(screen.getByText('4.5 out of 5 stars')).toBeInTheDocument();
+  });
+
+  it('hides the rating row when there is no feedback', () => {
+    render(<ProductCard product={makeProduct()} rating={{ count: 0, average: 0 }} />);
+    expect(screen.queryByText(/reviews?\)/)).not.toBeInTheDocument();
+  });
+});

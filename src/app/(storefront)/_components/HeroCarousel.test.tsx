@@ -1,75 +1,123 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { HeroCarousel } from './HeroCarousel';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { HeroCarousel, HERO_SLIDES } from './HeroCarousel';
 
-describe('HeroCarousel — product images (bug fix)', () => {
-  it('renders a real product image on every slide when slideImages are provided', () => {
+function track(container: HTMLElement) {
+  return container.querySelector('[style*="translateX"]') as HTMLElement;
+}
+
+function activeIndex(container: HTMLElement) {
+  return -parseInt(/translateX\(-?(\d+)%\)/.exec(track(container).style.transform)![1], 10) / 100 || 0;
+}
+
+describe('HeroCarousel', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('renders 4 slides with carousel semantics; only the active slide is exposed', () => {
+    const { container } = render(<HeroCarousel />);
+    expect(HERO_SLIDES).toHaveLength(4);
+    expect(screen.getByRole('region', { name: 'Featured products' })).toHaveAttribute(
+      'aria-roledescription',
+      'carousel',
+    );
+    const slides = container.querySelectorAll('[aria-roledescription="slide"]');
+    expect(slides).toHaveLength(4);
+    expect(slides[0]).toHaveAttribute('aria-hidden', 'false');
+    expect(slides[1]).toHaveAttribute('aria-hidden', 'true');
+    expect(slides[0]).toHaveAttribute('aria-label', '1 of 4');
+    expect(screen.getByRole('heading', { name: HERO_SLIDES[0].headline })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: HERO_SLIDES[0].linkLabel })).toBeInTheDocument();
+  });
+
+  it('arrow buttons navigate and wrap around', () => {
+    const { container } = render(<HeroCarousel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Next slide' }));
+    expect(track(container).style.transform).toBe('translateX(-100%)');
+    fireEvent.click(screen.getByRole('button', { name: 'Previous slide' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Previous slide' }));
+    expect(track(container).style.transform).toBe('translateX(-300%)');
+  });
+
+  it('dots jump to a slide and mark the current one', () => {
+    const { container } = render(<HeroCarousel />);
+    const dots = screen.getAllByRole('button', { name: /Go to slide/ });
+    expect(dots).toHaveLength(4);
+    fireEvent.click(dots[2]);
+    expect(track(container).style.transform).toBe('translateX(-200%)');
+    expect(dots[2]).toHaveAttribute('aria-current', 'true');
+    expect(dots[0]).not.toHaveAttribute('aria-current');
+  });
+
+  it('supports keyboard arrows', () => {
+    const { container } = render(<HeroCarousel />);
+    const region = screen.getByRole('region', { name: 'Featured products' });
+    fireEvent.keyDown(region, { key: 'ArrowRight' });
+    expect(track(container).style.transform).toBe('translateX(-100%)');
+    fireEvent.keyDown(region, { key: 'ArrowLeft' });
+    expect(activeIndex(container)).toBe(0);
+  });
+
+  it('supports swipe on touch (and ignores tiny movements)', () => {
+    const { container } = render(<HeroCarousel />);
+    const region = screen.getByRole('region', { name: 'Featured products' });
+    fireEvent.touchStart(region, { touches: [{ clientX: 300 }] });
+    fireEvent.touchEnd(region, { changedTouches: [{ clientX: 290 }] });
+    expect(track(container).style.transform).toBe('translateX(-0%)');
+    fireEvent.touchStart(region, { touches: [{ clientX: 300 }] });
+    fireEvent.touchEnd(region, { changedTouches: [{ clientX: 100 }] });
+    expect(track(container).style.transform).toBe('translateX(-100%)');
+    fireEvent.touchStart(region, { touches: [{ clientX: 100 }] });
+    fireEvent.touchEnd(region, { changedTouches: [{ clientX: 300 }] });
+    expect(track(container).style.transform).toBe('translateX(-0%)');
+  });
+
+  it('autoplays, and pauses while hovered', () => {
+    const { container } = render(<HeroCarousel autoplayMs={1000} />);
+    const region = screen.getByRole('region', { name: 'Featured products' });
+    act(() => void vi.advanceTimersByTime(1000));
+    expect(track(container).style.transform).toBe('translateX(-100%)');
+
+    fireEvent.mouseEnter(region);
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(track(container).style.transform).toBe('translateX(-100%)');
+
+    fireEvent.mouseLeave(region);
+    act(() => void vi.advanceTimersByTime(1000));
+    expect(track(container).style.transform).toBe('translateX(-200%)');
+  });
+
+  it('does not autoplay when prefers-reduced-motion is set', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
+    const { container } = render(<HeroCarousel autoplayMs={1000} />);
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(track(container).style.transform).toBe('translateX(-0%)');
+    vi.unstubAllGlobals();
+  });
+
+  it('renders slide images from the data array with alt text and mobile fallback', () => {
     const { container } = render(
       <HeroCarousel
-        featuredProductName="Radiant C Elixir"
-        slideImages={[
-          { url: 'https://example.supabase.co/storage/v1/object/public/media/a.jpg', alt: 'Product A' },
-          { url: 'https://example.supabase.co/storage/v1/object/public/media/b.jpg', alt: 'Product B' },
-          {
-            url: 'https://example.supabase.co/storage/v1/object/public/media/radiant-c.jpg',
-            alt: 'Radiant C Elixir bottle',
-          },
+        slides={[
+          { src: '/a.webp', alt: 'A', headline: 'HA', subline: 'SA', linkLabel: 'LA', linkHref: '/a' },
+          { src: '/b.webp', mobileSrc: '/b-m.webp', alt: 'B', headline: 'HB', subline: 'SB', linkLabel: 'LB', linkHref: '/b' },
         ]}
       />,
     );
-
-    expect(screen.getByAltText('Product A')).toBeInTheDocument();
-    expect(screen.getByAltText('Product B')).toBeInTheDocument();
-    expect(screen.getByAltText('Radiant C Elixir bottle')).toBeInTheDocument();
-    // Only the active slide is exposed via role (others are aria-hidden until
-    // rotated into view) — assert real <img> element count via the DOM instead.
-    expect(container.querySelectorAll('img')).toHaveLength(3);
-  });
-
-  it('falls back to the placeholder icon per-slide when a slide has no image', () => {
-    const { container } = render(
-      <HeroCarousel
-        featuredProductName="Radiant C Elixir"
-        slideImages={[
-          null,
-          null,
-          {
-            url: 'https://example.supabase.co/storage/v1/object/public/media/radiant-c.jpg',
-            alt: 'Radiant C Elixir bottle',
-          },
-        ]}
-      />,
-    );
-
-    expect(screen.getByAltText('Radiant C Elixir bottle')).toBeInTheDocument();
-    expect(container.querySelectorAll('img')).toHaveLength(1);
-    // The other 2 slides still render the placeholder droplet icon.
-    expect(container.querySelectorAll('svg path[d^="M32 6c8 10 18 18 18 30"]')).toHaveLength(2);
-  });
-
-  it('falls back to the placeholder icon on every slide when no slideImages prop is passed', () => {
-    const { container } = render(<HeroCarousel featuredProductName="Radiant C Elixir" />);
-
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    expect(container.querySelectorAll('svg path[d^="M32 6c8 10 18 18 18 30"]')).toHaveLength(3);
-  });
-
-  it('uses the product name as alt text fallback when the image has no alt', () => {
-    render(
-      <HeroCarousel
-        featuredProductName="Radiant C Elixir"
-        slideImages={[
-          null,
-          null,
-          {
-            url: 'https://example.supabase.co/storage/v1/object/public/media/radiant-c.jpg',
-            alt: null,
-            name: 'Radiant C Elixir',
-          },
-        ]}
-      />,
-    );
-
-    expect(screen.getByAltText('Radiant C Elixir')).toBeInTheDocument();
+    const imgs = container.querySelectorAll('img');
+    expect(imgs).toHaveLength(2);
+    expect(imgs[0]).toHaveAttribute('src', '/a.webp');
+    expect(imgs[1]).toHaveAttribute('src', '/b-m.webp');
+    expect(container.querySelectorAll('source[srcset="/b.webp"]')).toHaveLength(1);
   });
 });

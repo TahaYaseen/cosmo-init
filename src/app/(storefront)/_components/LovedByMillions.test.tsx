@@ -41,7 +41,7 @@ describe('LovedByMillions (bug-fix-scope Root Cause 6)', () => {
 
   it('renders the supporting image with appropriate alt text', () => {
     render(<LovedByMillions />);
-    const image = screen.getByAltText('Three people holding Glowrie products in a retail setting');
+    const image = screen.getByAltText('Glowrie Daily Moisturizing Lotion bottle');
     expect(image).toBeInTheDocument();
   });
 });

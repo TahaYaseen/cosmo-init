@@ -5,6 +5,8 @@ import { ErrorState } from '@/components/feedback/ErrorState';
 import { SpecTable } from '@/components/products/SpecTable';
 import { FragranceNotesBreakdown } from '@/components/products/FragranceNotesBreakdown';
 import { BuyButton } from '@/components/products/BuyButton';
+import { ProductFeedbackSection } from '@/components/products/ProductFeedbackSection';
+import { getPublishedFeedback } from '@/lib/feedback';
 import { formatINR } from '@/lib/utils';
 import type { Product } from '@/lib/types';
 
@@ -78,6 +80,7 @@ export default async function ProductDetailPage({
 
   const { product } = outcome;
   const image = typeof product.image === 'object' ? product.image : null;
+  const feedback = await getPublishedFeedback(String(product.id));
 
   return (
     <>
@@ -123,6 +126,8 @@ export default async function ProductDetailPage({
       </div>
 
       <FragranceNotesBreakdown product={product} />
+
+      <ProductFeedbackSection feedback={feedback} />
     </>
   );
 }

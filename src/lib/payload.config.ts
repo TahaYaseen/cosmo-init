@@ -6,6 +6,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical';
 import { s3Storage } from '@payloadcms/storage-s3';
 
 import { Products } from '../collections/Products';
+import { ProductFeedback } from '../collections/ProductFeedback';
 import { Media } from '../collections/Media';
 import { Users } from '../collections/Users';
 
@@ -40,7 +41,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname, '..'),
     },
   },
-  collections: [Products, Media, Users],
+  collections: [Products, ProductFeedback, Media, Users],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

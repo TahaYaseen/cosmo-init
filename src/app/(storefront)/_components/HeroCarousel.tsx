@@ -1,190 +1,231 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import type { KeyboardEvent, TouchEvent } from 'react';
 
-export interface HeroSlideVisual {
-  url?: string | null;
-  alt?: string | null;
-  /** Optional display-name fallback, used as alt-text when the Media has none. */
-  name?: string | null;
+export interface HeroSlide {
+  /** Desktop/tablet image (wide ~16:7 canvas, subject on the right). */
+  src: string;
+  /** Optional mobile image (~6:5, subject centred). Falls back to `src`. */
+  mobileSrc?: string;
+  alt: string;
+  headline: string;
+  subline: string;
+  linkLabel: string;
+  linkHref: string;
 }
 
-export interface HeroCarouselProps {
-  /** Name of the currently-featured product, used on the 3rd marketing slide. */
-  featuredProductName?: string;
-  /**
-   * Index-aligned marketing banner visual per slide. Intentionally decoupled
-   * from any Product's own `image` field (see page.tsx's getHeroBannerVisual)
-   * — this is dedicated banner art, not a product catalog photo, even though
-   * it happens to share the same `{ url, alt }` shape as the Media-relation
-   * resolution used by ProductCard.tsx / FeaturedSpotlight.tsx. Currently all
-   * 3 slides are given the same banner asset by the caller; a `null`/missing
-   * entry falls back to the placeholder icon for that slide.
-   */
-  slideImages?: Array<HeroSlideVisual | null>;
-}
-
-const AUTOPLAY_MS = 5000;
+/** Hero images are hosted on Cloudinary (res.cloudinary.com is allowed in next.config). */
+const HERO_CDN = 'https://res.cloudinary.com/rav4zol0/image/upload/v1792494308/';
 
 /**
- * Home hero marketing carousel — 3 slides, autoplay every 5s, pauses on
- * hover. This is static marketing content (not CMS-managed, per ADR-007's
- * spirit for non-Product content) except the 3rd slide's headline, which
- * reflects the real Featured Product name, and the 3rd slide's visual, which
- * reflects the real Featured Product image (fetched from the Products
- * collection the same way the product grid/spotlight sections render it).
+ * Slides are plain data: re-uploading the images to Cloudinary (same file names)
+ * or editing this array needs no component changes.
+ * NOTE: the current images are PLACEHOLDERS composited from reference
+ * packaging shots — swap in real campaign imagery when available.
  */
-export function HeroCarousel({ featuredProductName, slideImages }: HeroCarouselProps) {
+export const HERO_SLIDES: HeroSlide[] = [
+  {
+    src: `${HERO_CDN}slide-sunscreen.webp`,
+    mobileSrc: `${HERO_CDN}slide-sunscreen-mobile.webp`,
+    alt: 'Glowrie Sunscreen SPF 50 tube',
+    headline: 'Daily protection, weightless.',
+    subline: 'SPF 50 that disappears into skin.',
+    linkLabel: 'Shop sunscreen',
+    linkHref: '/#core-formulations',
+  },
+  {
+    src: `${HERO_CDN}slide-face-wash.webp`,
+    mobileSrc: `${HERO_CDN}slide-face-wash-mobile.webp`,
+    alt: 'Glowrie Hydrating Face Wash tube',
+    headline: 'Cleanse. Balance. Refresh.',
+    subline: 'A gentle daily wash for calm, clear skin.',
+    linkLabel: 'Shop face wash',
+    linkHref: '/#core-formulations',
+  },
+  {
+    src: `${HERO_CDN}slide-face-lotion.webp`,
+    mobileSrc: `${HERO_CDN}slide-face-lotion-mobile.webp`,
+    alt: 'Glowrie Daily Moisturizing Lotion bottle',
+    headline: 'Hydration, perfected.',
+    subline: 'Ectoin, Vitamin C and E in one light lotion.',
+    linkLabel: 'Shop face lotion',
+    linkHref: '/#core-formulations',
+  },
+  {
+    src: `${HERO_CDN}slide-body-wash.webp`,
+    mobileSrc: `${HERO_CDN}slide-body-wash-mobile.webp`,
+    alt: 'Glowrie Body Wash bottle',
+    headline: 'Care, head to toe.',
+    subline: 'A rich, nourishing wash for soft, healthy skin.',
+    linkLabel: 'Shop body wash',
+    linkHref: '/#core-formulations',
+  },
+];
+
+export interface HeroCarouselProps {
+  slides?: HeroSlide[];
+  autoplayMs?: number;
+}
+
+const SWIPE_THRESHOLD_PX = 40;
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function getReducedMotion() {
+  return typeof window !== 'undefined' && !!window.matchMedia?.(REDUCED_MOTION_QUERY).matches;
+}
+
+function subscribeReducedMotion(onChange: () => void) {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => {};
+  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
+  mq.addEventListener?.('change', onChange);
+  return () => mq.removeEventListener?.('change', onChange);
+}
+
+export function HeroCarousel({ slides = HERO_SLIDES, autoplayMs = 6000 }: HeroCarouselProps) {
+  const count = slides.length;
   const [index, setIndex] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [paused, setPaused] = useState(false);
+  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, getReducedMotion, () => false);
+  const touchStartX = useRef<number | null>(null);
 
-  const slides = [
-    {
-      eyebrow: 'The Modern Apothecary',
-      heading: (
-        <>
-          Clinically
-          <br />
-          Formulated.
-          <br />
-          Transparently
-          <br />
-          Delivered.
-        </>
-      ),
-      ctaLabel: 'Formulate Your Routine',
-      ctaHref: '#core-formulations',
-    },
-    {
-      eyebrow: 'Our Philosophy',
-      heading: (
-        <>
-          Perpetual
-          <br />
-          Alchemy. The
-          <br />
-          Soul of Science.
-        </>
-      ),
-      ctaLabel: 'Explore the Science',
-      ctaHref: '/about',
-      showFeaturedImage: false,
-    },
-    {
-      eyebrow: 'Featured Elixir',
-      heading: <>{featuredProductName || 'Featured Formula'}</>,
-      ctaLabel: 'Shop the Elixir',
-      ctaHref: '#featured-spotlight',
-    },
-  ];
+  const goTo = useCallback(
+    (next: number) => setIndex(((next % count) + count) % count),
+    [count],
+  );
 
-  function restart() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setIndex((i) => (i + 1) % slides.length);
-    }, AUTOPLAY_MS);
-  }
-
+  // Autoplay: re-armed after every slide change (manual or automatic).
   useEffect(() => {
-    restart();
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (paused || reducedMotion || count < 2) return;
+    const t = setTimeout(() => setIndex((i) => (i + 1) % count), autoplayMs);
+    return () => clearTimeout(t);
+  }, [index, paused, reducedMotion, count, autoplayMs]);
 
-  function goTo(next: number) {
-    setIndex(((next % slides.length) + slides.length) % slides.length);
-    restart();
+  function onKeyDown(e: KeyboardEvent<HTMLElement>) {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      goTo(index - 1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      goTo(index + 1);
+    }
   }
+
+  function onTouchStart(e: TouchEvent) {
+    touchStartX.current = e.touches[0]?.clientX ?? null;
+  }
+
+  function onTouchEnd(e: TouchEvent) {
+    const start = touchStartX.current;
+    touchStartX.current = null;
+    const end = e.changedTouches[0]?.clientX;
+    if (start == null || end == null) return;
+    const delta = end - start;
+    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return;
+    goTo(delta < 0 ? index + 1 : index - 1);
+  }
+
+  const arrowBase =
+    'group absolute z-20 flex items-center justify-center text-on-surface/70 transition-colors ' +
+    'bottom-3 h-10 w-10 rounded-full bg-white/60 hover:bg-white/90 ' +
+    'md:bottom-auto md:top-0 md:h-full md:w-[9%] md:rounded-none md:bg-transparent md:hover:bg-black/[0.03]';
 
   return (
-    <header
-      className="relative h-screen min-h-[560px] w-full overflow-hidden"
-      onMouseEnter={() => timerRef.current && clearInterval(timerRef.current)}
-      onMouseLeave={restart}
+    <section
+      aria-roledescription="carousel"
+      aria-label="Featured products"
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      className="relative w-full overflow-hidden bg-[#f6f1e9] pt-16 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-outline md:pt-20"
     >
-      {slides.map((slide, i) => (
-        <div
-          key={i}
-          className={`absolute inset-0 flex flex-col opacity-0 transition-opacity duration-1000 md:flex-row ${
-            i === index ? 'z-10 opacity-100' : 'z-0'
-          }`}
-          aria-hidden={i !== index}
-        >
-          <div className="flex w-full flex-col justify-center gap-6 bg-surface-lowest px-4 pb-12 pt-24 md:w-1/2 md:px-16 md:py-0">
-            <span className="font-body text-xs font-semibold uppercase tracking-[0.1em] text-outline">
-              {slide.eyebrow}
-            </span>
-            <h1 className="font-display text-[44px] font-semibold leading-[0.95] text-on-surface md:text-[80px]">
-              {slide.heading}
-            </h1>
-            <a
-              href={slide.ctaHref}
-              className="mt-2 inline-flex w-max items-center gap-2 border border-obsidian bg-obsidian px-8 py-4 text-xs font-semibold uppercase tracking-[0.1em] text-white hover:bg-secondary"
-            >
-              {slide.ctaLabel}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-            </a>
-          </div>
-          <div className="relative flex flex-1 items-center justify-center bg-gradient-to-br from-surface-low to-surface-lowest md:w-1/2">
-            {(() => {
-              const visual = slideImages?.[i];
-              return visual?.url ? (
-                <Image
-                  src={visual.url}
-                  alt={visual.alt || visual.name || featuredProductName || 'Featured product'}
-                  fill
-                  className="object-contain p-12"
-                  sizes="(min-width: 768px) 50vw, 100vw"
+      <div
+        className="flex transition-transform duration-700 ease-[cubic-bezier(0.22,0.61,0.36,1)] motion-reduce:transition-none"
+        style={{ transform: `translateX(-${index * 100}%)` }}
+        aria-live={paused || reducedMotion ? 'polite' : 'off'}
+      >
+        {slides.map((slide, i) => (
+          <div
+            key={slide.src}
+            role="group"
+            aria-roledescription="slide"
+            aria-label={`${i + 1} of ${count}`}
+            aria-hidden={i !== index}
+            inert={i !== index}
+            className="relative flex w-full shrink-0 flex-col md:h-[clamp(420px,50vw,720px)] md:flex-row"
+          >
+            <div className="relative z-10 flex flex-col justify-center gap-3 px-6 pb-2 pt-8 text-center md:w-[46%] md:items-start md:gap-4 md:py-0 md:pl-[12%] md:pr-6 md:text-left lg:w-[42%]">
+              <h2 className="font-display text-[32px] font-medium leading-[1.05] tracking-tight text-on-surface md:text-[clamp(32px,3.6vw,56px)]">
+                {slide.headline}
+              </h2>
+              <p className="text-base text-on-surface-variant md:text-lg">{slide.subline}</p>
+              <a
+                href={slide.linkHref}
+                className="mt-1 w-max self-center text-xs font-medium uppercase tracking-[0.14em] text-on-surface underline decoration-outline-variant underline-offset-[6px] transition-colors hover:decoration-on-surface md:self-start"
+              >
+                {slide.linkLabel}
+              </a>
+            </div>
+            <div className="relative aspect-[6/5] w-full md:absolute md:inset-0 md:aspect-auto">
+              <picture>
+                <source media="(min-width: 768px)" srcSet={slide.src} />
+                <img
+                  src={slide.mobileSrc ?? slide.src}
+                  alt={slide.alt}
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  decoding="async"
+                  className="h-full w-full object-contain md:object-cover md:object-[75%_50%]"
                 />
-              ) : (
-                <svg width="140" height="140" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-outline opacity-50" aria-hidden="true">
-                  <path d="M32 6c8 10 18 18 18 30a18 18 0 1 1-36 0C14 24 24 16 32 6Z" />
-                </svg>
-              );
-            })()}
+              </picture>
+            </div>
           </div>
-        </div>
-      ))}
-
-      <div className="absolute inset-0 z-20 flex items-center justify-between px-4 md:px-16">
-        <button
-          type="button"
-          aria-label="Previous slide"
-          onClick={() => goTo(index - 1)}
-          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant bg-surface/85"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          aria-label="Next slide"
-          onClick={() => goTo(index + 1)}
-          className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant bg-surface/85"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 gap-3">
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            aria-label={`Go to slide ${i + 1}`}
-            onClick={() => goTo(i)}
-            className={`h-2 rounded-full bg-outline-variant transition-all ${i === index ? 'w-6 bg-obsidian' : 'w-2'}`}
-          />
         ))}
       </div>
-    </header>
+
+      <button
+        type="button"
+        aria-label="Previous slide"
+        onClick={() => goTo(index - 1)}
+        className={`${arrowBase} left-3 md:left-0 md:cursor-w-resize`}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        aria-label="Next slide"
+        onClick={() => goTo(index + 1)}
+        className={`${arrowBase} right-3 md:right-0 md:cursor-e-resize`}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+      </button>
+
+      <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center">
+        {slides.map((slide, i) => (
+          <button
+            key={slide.src}
+            type="button"
+            aria-label={`Go to slide ${i + 1}`}
+            aria-current={i === index ? 'true' : undefined}
+            onClick={() => goTo(i)}
+            className="flex h-6 w-6 items-center justify-center"
+          >
+            <span
+              className={`block h-1.5 rounded-full transition-all duration-300 ${
+                i === index ? 'w-5 bg-on-surface' : 'w-1.5 bg-on-surface/30'
+              }`}
+            />
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

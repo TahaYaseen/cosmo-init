@@ -3,14 +3,17 @@ import { render, screen } from '@testing-library/react';
 import { makeProduct, makeSparseProduct } from '@/test-utils/fixtures';
 
 const findByIDMock = vi.fn();
+const findMock = vi.fn();
 
 vi.mock('@/lib/getPayloadClient', () => ({
-  getPayloadClient: vi.fn(async () => ({ findByID: findByIDMock })),
+  getPayloadClient: vi.fn(async () => ({ findByID: findByIDMock, find: findMock })),
 }));
 
 describe('ProductDetailPage (UC-002)', () => {
   beforeEach(() => {
     findByIDMock.mockReset();
+    findMock.mockReset();
+    findMock.mockResolvedValue({ docs: [] });
   });
 
   it('renders all populated fields for a fully-populated product (AC1)', async () => {
@@ -64,5 +67,24 @@ describe('ProductDetailPage (UC-002)', () => {
     expect(screen.queryByText('pH Level')).not.toBeInTheDocument();
     expect(screen.queryByText('Top Notes')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Coming Soon' })).toBeInTheDocument();
+  });
+
+  it('shows published feedback and hides the section when none/DB error', async () => {
+    findByIDMock.mockResolvedValue(makeProduct());
+    findMock.mockResolvedValueOnce({
+      docs: [{ id: 'f1', authorName: 'Asha', rating: 5, comment: 'Lovely glow', feedbackDate: '2026-09-01T00:00:00.000Z' }],
+    });
+    const { default: ProductDetailPage } = await import('./page');
+    const first = render(await ProductDetailPage({ params: Promise.resolve({ id: 'gl-01' }) }));
+    expect(screen.getByText('Customer Feedback')).toBeInTheDocument();
+    expect(screen.getByText('Lovely glow')).toBeInTheDocument();
+    first.unmount();
+
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    findMock.mockRejectedValueOnce(new Error('db down'));
+    render(await ProductDetailPage({ params: Promise.resolve({ id: 'gl-01' }) }));
+    expect(screen.queryByText('Customer Feedback')).not.toBeInTheDocument();
+    expect(screen.getByText('Radiant C Elixir')).toBeInTheDocument();
+    spy.mockRestore();
   });
 });
